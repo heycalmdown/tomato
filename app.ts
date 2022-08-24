@@ -47,19 +47,20 @@ async function ensure(func: Function, client: WebClient, command: SlashCommand) 
   }
 }
 
-async function startTomato(token: string, client: WebClient) {
+async function startTomato(token: string, client: WebClient, status: string) {
     await client.dnd.setSnooze({ num_minutes: 2, token })
     await client.users.profile.set({ token, profile: JSON.stringify({
-      status_text: '바뻐',
+      status_text: status,
       status_emoji: ':tomato:'
     })});
     await client.users.setPresence({ presence: 'away', token })
 }
 
-async function stopTomato(token: string, client: WebClient, ts: string) {
+async function stopTomato(token: string, client: WebClient, ts?: string) {
     await client.dnd.endSnooze({ token });
     await client.users.profile.set({ token, name: 'status_text', value: '원래대로' });
     await client.users.setPresence({ presence: 'auto', token });
+    if (!ts) return;
     await client.chat.postMessage({
       thread_ts: ts,
       channel: 'C03V6AS6GV6',
@@ -73,17 +74,20 @@ async function stopTomato(token: string, client: WebClient, ts: string) {
     });
 }
 
-app.command('/tomato', async ({ command, ack, respond, say, client, logger}) => {
+function getToken(user: string) {
+  return process.env.SLACK_USER_TOKEN!;
+}
+
+app.command('/tomato', async ({ command, ack, say, client }) => {
   await ack();
   await ensure(async () => {
     const startMessage = await say({
       username: command.user_name,
-      icon_url: 'https://ca.slack-edge.com/T03UK3NE9RA-U03UDLNP5NZ-g029a0f65d07-512',
-      text: [`${command.user_name}님이 토마토 시작... for 2 mins`, `• ${command.text}`].filter(Boolean).join('\n'),
+      text: [`토마토 시작... for 2 mins`, `• ${command.text}`].filter(Boolean).join('\n'),
       mrkdwn: true,
     })
     const token = process.env.SLACK_USER_TOKEN!;
-    await startTomato(token, client);
+    await startTomato(token, client, command.text);
     setTimeout(() => {
       stopTomato(token, client, startMessage.ts!);
     }, 2 * 1000);
