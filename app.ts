@@ -80,31 +80,30 @@ function getToken(user: string) {
 
 app.command('/tomato', async ({ command, ack, say, client }) => {
   await ack();
+  const text = `\`${command.text}\` for 5 mins...`;
   await ensure(async () => {
     await say({
       username: command.user_name,
-      text: `\`${command.text}\` for 2 mins...`,
-      mrkdwn: true,
+      text, mrkdwn: true,
       blocks: [
         {
-          "type": "section",
-          "text": {
-            type: 'mrkdwn',
-            text: `\`${command.text}\` for 2 mins...`,
+          type: 'section',
+          text: {
+            text, type: 'mrkdwn',
           }
         },
         {
-          "type": "actions",
-          "elements": [
+          type: 'actions',
+          elements: [
             {
-              "type": "button",
-              "text": {
-                "type": "plain_text",
-                "text": "Stop :tomato:",
-                "emoji": true
+              type: 'button',
+              text: {
+                type: 'plain_text',
+                text: ':tomato: Stop',
+                emoji: true
               },
-              "value": [command.user_id].join('-'),
-              "action_id": "stop-tomato"
+              value: [command.user_id].join('-'),
+              action_id: 'stop-tomato'
             }
           ]
         }
@@ -115,13 +114,25 @@ app.command('/tomato', async ({ command, ack, say, client }) => {
   }, client, command);
 });
 
-app.action('stop-tomato', async ({ ack, action, client, body}) => {
+app.action('stop-tomato', async ({ ack, action, client, body, respond}) => {
   await ack();
   if (body.type !== 'block_actions') return;
   if (action.type !== 'button') return;
-  console.log(action);
-  console.log(body);
   const token = getToken(action.value);
+  if (!body.message) return;
+  body.message.blocks[1] = {
+    type: 'section',
+    text: {
+      text: 'stopped :tomato:', type: 'mrkdwn'
+    }
+  };
+  await client.chat.update({
+    text: body.message.text,
+    channel: body.channel!.id,
+    ts: body.message.ts,
+    blocks: body.message.blocks
+  });
+  await respond(body.message);
   await stopTomato(token, client, body.message?.ts);
 });
 
