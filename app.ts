@@ -81,17 +81,48 @@ function getToken(user: string) {
 app.command('/tomato', async ({ command, ack, say, client }) => {
   await ack();
   await ensure(async () => {
-    const startMessage = await say({
+    await say({
       username: command.user_name,
-      text: [`토마토 시작... for 2 mins`, `• ${command.text}`].filter(Boolean).join('\n'),
+      text: `\`${command.text}\` for 2 mins...`,
       mrkdwn: true,
+      blocks: [
+        {
+          "type": "section",
+          "text": {
+            type: 'mrkdwn',
+            text: `\`${command.text}\` for 2 mins...`,
+          }
+        },
+        {
+          "type": "actions",
+          "elements": [
+            {
+              "type": "button",
+              "text": {
+                "type": "plain_text",
+                "text": "Stop :tomato:",
+                "emoji": true
+              },
+              "value": [command.user_id].join('-'),
+              "action_id": "stop-tomato"
+            }
+          ]
+        }
+      ],
     })
     const token = process.env.SLACK_USER_TOKEN!;
     await startTomato(token, client, command.text);
-    setTimeout(() => {
-      stopTomato(token, client, startMessage.ts!);
-    }, 2 * 1000);
   }, client, command);
+});
+
+app.action('stop-tomato', async ({ ack, action, client, body}) => {
+  await ack();
+  if (body.type !== 'block_actions') return;
+  if (action.type !== 'button') return;
+  console.log(action);
+  console.log(body);
+  const token = getToken(action.value);
+  await stopTomato(token, client, body.message?.ts);
 });
 
 (async () => {
