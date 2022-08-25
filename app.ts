@@ -60,20 +60,22 @@ async function startTomato(tomato: Tomato, client: WebClient, status: string) {
 }
 
 async function stopTomato(tomato: Tomato, client: WebClient) {
+  const now = new Date();
   const ts = tomato.lastTs;
   const token = getToken(tomato.user);
   await client.dnd.endSnooze({ token });
   await client.users.profile.set({ token, name: 'status_text', value: '원래대로' });
   await client.users.setPresence({ presence: 'auto', token });
-  tomato.lastTs = '';
+  tomato.status = (+now - tomato.until) <= 0 ? 'stopped' : 'completed';
+  await updateTomato(tomato);
   tomato.until = Number.MAX_SAFE_INTEGER;
-  tomato.status = 'stopped';
+  tomato.lastTs = '';
   await patchTomato(tomato);
   if (!ts) return;
   await client.chat.postMessage({
     thread_ts: ts,
     channel: 'C03V6AS6GV6',
-    text: '중간에 중단했습니다',
+    text: tomato.status === 'stopped' ? '중간에 중단했습니다' : '정상적으로 종료했습니다',
     metadata: JSON.stringify({
       event_type: 'tomato_completed',
       event_payload: {
@@ -154,22 +156,16 @@ app.action('stop-tomato', async ({ ack, action, client, body, respond}) => {
   if (body.type !== 'block_actions') return;
   if (action.type !== 'button') return;
   if (!body.message) return;
-  body.message.blocks[1] = {
-    type: 'section',
-    text: {
-      text: 'stopped :tomato:', type: 'mrkdwn'
-    }
-  };
-  await client.chat.update({
-    text: body.message.text,
-    channel: body.channel!.id,
-    ts: body.message.ts,
-    blocks: body.message.blocks
-  });
-  await respond(body.message);
   const tomato = await fetchTomato(action.value);
   if (tomato.lastTs === body.message.ts) {
     await stopTomato(tomato, client);
+  } else {
+    await updateTomato({
+      ...tomato,
+      channel: body.channel!.id,
+      lastTs: body.message.ts,
+      status: 'stopped',
+    });
   }
 });
 
@@ -187,7 +183,7 @@ interface Tomato {
   until: number;
   text: string;
   channel: string;
-  status: 'started' | 'stopped';
+  status: 'started' | 'stopped' | 'completed';
 }
 
 async function patchTomato(tomato: Tomato) {
@@ -215,8 +211,45 @@ async function setUsers(users: UserList) {
   await writeFile('users.json', JSON.stringify(users));
 }
 
+function createRemainingTimeBlock(tomato: Tomato): KnownBlock {
+  const now = +new Date();
+  return {
+    type: 'section',
+    text: {
+      type: 'plain_text',
+      text: `:hourglass_flowing_sand: 대충 ${Math.floor((tomato.until - now) / 1000)}초 남음`,
+      emoji: true,
+    }
+  }
+}
+
+function createStopBlock(tomato: Tomato): KnownBlock {
+  if (tomato.status !== 'started') {
+    return {
+      type: 'section',
+      text: {
+        text: 'stopped :tomato:', type: 'mrkdwn'
+      }
+    };
+  }
+  return {
+    type: 'actions',
+    elements: [
+      {
+        type: 'button',
+        text: {
+          type: 'plain_text',
+          text: 'Stop :tomato:',
+          emoji: true
+        },
+        value: [tomato.user].join('-'),
+        action_id: 'stop-tomato'
+      }
+    ]
+  }
+}
+
 async function updateTomato(tomato: Tomato) {
-  if (tomato.status !== 'started') return;
   const msg = await app.client.conversations.history({
     channel: tomato.channel,
     inclusive: true,
@@ -224,14 +257,21 @@ async function updateTomato(tomato: Tomato) {
     limit: 1,
   })
   const tomatoMessage = msg.messages![0];
-  const now = +new Date();
-  tomatoMessage.blocks![2].text!.text = `:hourglass_flowing_sand: 대충 ${Math.floor((tomato.until - now) / 1000)}초 남음`
-  const blocks = tomatoMessage.blocks!
-  app.client.chat.update({
+  if (!tomatoMessage.blocks || tomatoMessage.blocks.length < 1) return;
+
+  const blocks = [
+    tomatoMessage.blocks![0] as Block,
+    createStopBlock(tomato),
+  ];
+  if (tomato.status === 'started') {
+    blocks.push(createRemainingTimeBlock(tomato));
+  }
+
+  await app.client.chat.update({
     channel: tomato.channel,
     ts: tomato.lastTs,
     text: tomatoMessage.text,
-    blocks: blocks as Block[],
+    blocks,
   });
 }
 
