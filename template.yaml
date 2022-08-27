@@ -1,0 +1,98 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Tomato Bot
+
+Transform: AWS::Serverless-2016-10-31
+
+Globals:
+  Function:
+    Runtime: nodejs16.x
+    MemorySize: 128
+    Timeout: 10
+    Environment:
+      Variables:
+        NODE_OPTIONS: --enable-source-maps
+        SLACK_SIGNING_SECRET: '{{resolve:ssm:/tomato/SLACK_SIGNING_SECRET}}'
+        SLACK_CLIENT_ID: '{{resolve:ssm:/tomato/SLACK_CLIENT_ID}}'
+        SLACK_CLIENT_SECRET: '{{resolve:ssm:/tomato/SLACK_CLIENT_SECRET}}'
+        SLACK_BOT_TOKEN: '{{resolve:ssm:/tomato/SLACK_BOT_TOKEN}}'
+
+Resources:
+  Update:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints: 
+          - src/timer.ts
+    Properties:
+      Handler: src/timer.handler
+      Role: arn:aws:iam::472696305832:role/tomato-dev
+      Events:
+        PerMinutes:
+          Type: Schedule
+          Properties:
+            Schedule: rate(1 minute)
+
+  SlackCommand:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints: 
+          - src/lambda.ts
+    Properties:
+      Handler: src/lambda.handler
+      Role: arn:aws:iam::472696305832:role/tomato-dev
+      Events:
+        Http:
+          Type: Api
+          Properties:
+            Path: '/slack/command'
+            Method: post
+
+  SlackInstall:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints: 
+          - src/install.ts
+    Properties:
+      Handler: src/install.handler
+      Role: arn:aws:iam::472696305832:role/tomato-dev
+      Events:
+        Http:
+          Type: Api
+          Properties:
+            Path: '/slack/install'
+            Method: get
+
+  SlackCallback:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints: 
+          - src/install.ts
+    Properties:
+      Handler: src/install.handler
+      Role: arn:aws:iam::472696305832:role/tomato-dev
+      Events:
+        Http:
+          Type: Api
+          Properties:
+            Path: '/slack/oauth_redirect'
+            Method: get

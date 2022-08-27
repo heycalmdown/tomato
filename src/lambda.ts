@@ -1,6 +1,7 @@
 import { App, AwsLambdaReceiver, LogLevel } from '@slack/bolt'
 
 import { init } from './handlers'
+import { initModels } from './model';
 
 const awsLambdaReceiver = new AwsLambdaReceiver({
   signingSecret: process.env.SLACK_SIGNING_SECRET!,
@@ -18,6 +19,7 @@ const app = new App({
 init(app);
 
 module.exports.handler = async (event: any, context: any, callback: any) => {
+  await initModels();
   const handler = await awsLambdaReceiver.start();
   return handler(event, context, callback);
 }

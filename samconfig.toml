@@ -1,0 +1,15 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "tomato-dev2"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-jp25779nv8br"
+s3_prefix = "tomato-dev2"
+region = "ap-northeast-2"
+profile = "tomato"
+capabilities = "CAPABILITY_IAM"
+image_repositories = []
+[default.build.parameters]
+beta_features = true
+[default.sync.parameters]
+beta_features = true

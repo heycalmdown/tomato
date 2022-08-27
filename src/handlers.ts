@@ -1,6 +1,6 @@
-import { App, Block, asCodedError, KnownBlock, FileInstallationStore, SlashCommand } from '@slack/bolt';
+import { App, Block, asCodedError, KnownBlock, SlashCommand } from '@slack/bolt';
 import { WebClient } from '@slack/web-api'
-import { fetchTomato, patchTomato, fetchUsers } from './repository';
+import { fetchTomato, patchTomato, fetchStartedTomatoes, getToken } from './repository';
 import { Tomato } from './interface'
 
 let app: App;
@@ -31,7 +31,7 @@ export function init(_app: App) {
     }, client, command);
   });
 
-  app.action('stop-tomato', async ({ ack, action, client, body, respond}) => {
+  app.action('stop-tomato', async ({ ack, action, client, body}) => {
     await ack();
     if (body.type !== 'block_actions') return;
     if (action.type !== 'button') return;
@@ -72,7 +72,7 @@ async function ensure(func: Function, client: WebClient, command: SlashCommand) 
 }
 
 async function startTomato(tomato: Tomato, client: WebClient, status: string) {
-  const token = getToken(tomato.user);
+  const token = await getToken(tomato.user);
 
   await client.dnd.setSnooze({ num_minutes: tomato.mins, token })
   await client.users.profile.set({ token, profile: JSON.stringify({
@@ -85,7 +85,7 @@ async function startTomato(tomato: Tomato, client: WebClient, status: string) {
 async function stopTomato(tomato: Tomato, client: WebClient) {
   const now = new Date();
   const ts = tomato.lastTs;
-  const token = getToken(tomato.user);
+  const token = await getToken(tomato.user);
   await client.dnd.endSnooze({ token });
   await client.users.profile.set({ token, name: 'status_text', value: '원래대로' });
   await client.users.setPresence({ presence: 'auto', token });
@@ -106,10 +106,6 @@ async function stopTomato(tomato: Tomato, client: WebClient) {
       }
     })
   });
-}
-
-function getToken(user: string) {
-  return process.env.SLACK_USER_TOKEN!;
 }
 
 function createBlocks(text: string, user: string): KnownBlock[] {
@@ -215,15 +211,15 @@ async function updateTomato(tomato: Tomato) {
 }
 
 export async function expireTomatoes() {
-  console.log('interval', new Date().toLocaleString())
-  const users = await fetchUsers();
-  const tomatoes = await Promise.all(users.map(u => fetchTomato(u)));
-  const started = tomatoes.filter(t => t.status === 'started');
+  const now = new Date();
+  console.log('interval', now.toLocaleString(), +now);
+
+  const started = await fetchStartedTomatoes(now);
+  if (started.length === 0) return;
 
   await Promise.all(started.map(updateTomato));
 
-  const now = +new Date();
-  const expired = started.filter(t => t.until < now);
+  const expired = started.filter(t => t.until < +now);
 
   console.log(`expired ${expired.length} / ${started.length}`);
   console.log(expired);
