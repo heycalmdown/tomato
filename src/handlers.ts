@@ -2,12 +2,10 @@ import { App, Block, asCodedError, KnownBlock, SlashCommand } from '@slack/bolt'
 import { WebClient } from '@slack/web-api'
 import { fetchTomato, patchTomato, fetchStartedTomatoes, getToken } from './repository';
 import { Tomato } from './interface'
+import { DDInstallationStore } from './installation-store'
 
-let app: App;
-
-export function init(_app: App) {
-  app = _app;
-  app.command('/tomato', async ({ command, ack, say, client }) => {
+export function init(app: App) {
+  app.command('/tomato', async ({ command, ack, say, client, context }) => {
     await ack();
     const text = `<@${command.user_id}> has started a tomato \`${command.text}\` for 5 mins...`;
     await ensure(async () => {
@@ -26,6 +24,8 @@ export function init(_app: App) {
         mins: 5,
         until,
         status: 'started',
+        botToken: context.botToken!,
+        userToken: context.userToken!,
       });
       await startTomato(tomato, client, command.text);
     }, client, command);
@@ -45,10 +45,28 @@ export function init(_app: App) {
         channel: body.channel!.id,
         lastTs: body.message.ts,
         status: 'stopped',
-      });
+      }, client);
     }
   });
 
+  app.event('app_uninstalled', async ({ context, event }) => {
+    console.log('uninstall', context, event);
+    const { teamId, enterpriseId, isEnterpriseInstall } = context;
+    await new DDInstallationStore({}).deleteInstallation({
+      teamId, enterpriseId, isEnterpriseInstall, 
+    });
+  });
+
+  app.event('tokens_revoked', async ({ context, event }) => {
+    console.log('tokens revoked', context, event);
+    const store = new DDInstallationStore({});
+    const { teamId, enterpriseId, isEnterpriseInstall } = context;
+    if (event.tokens.oauth) {
+      await Promise.all(event.tokens.oauth.map(userId => store.deleteInstallation({
+        teamId, enterpriseId, isEnterpriseInstall, userId,
+      })))
+    }
+  });
 }
 
 
@@ -82,7 +100,9 @@ async function startTomato(tomato: Tomato, client: WebClient, status: string) {
   await client.users.setPresence({ presence: 'away', token })
 }
 
-async function stopTomato(tomato: Tomato, client: WebClient) {
+async function stopTomato(tomato: Tomato, client?: WebClient) {
+  client = client || new WebClient(tomato.botToken);
+
   const now = new Date();
   const ts = tomato.lastTs;
   const token = await getToken(tomato.user);
@@ -90,7 +110,7 @@ async function stopTomato(tomato: Tomato, client: WebClient) {
   await client.users.profile.set({ token, name: 'status_text', value: '원래대로' });
   await client.users.setPresence({ presence: 'auto', token });
   tomato.status = (+now - tomato.until) <= 0 ? 'stopped' : 'completed';
-  await updateTomato(tomato);
+  await updateTomato(tomato, client)
   tomato.until = Number.MAX_SAFE_INTEGER;
   tomato.lastTs = '';
   await patchTomato(tomato);
@@ -184,8 +204,10 @@ function createStopBlock(tomato: Tomato): KnownBlock {
   }
 }
 
-async function updateTomato(tomato: Tomato) {
-  const msg = await app.client.conversations.history({
+async function updateTomato(tomato: Tomato, client?: WebClient) {
+  client = client || new WebClient(tomato.botToken);
+
+  const msg = await client.conversations.history({
     channel: tomato.channel,
     inclusive: true,
     latest: tomato.lastTs,
@@ -202,7 +224,7 @@ async function updateTomato(tomato: Tomato) {
     blocks.push(createRemainingTimeBlock(tomato));
   }
 
-  await app.client.chat.update({
+  await client.chat.update({
     channel: tomato.channel,
     ts: tomato.lastTs,
     text: tomatoMessage.text,
@@ -217,12 +239,12 @@ export async function expireTomatoes() {
   const started = await fetchStartedTomatoes(now);
   if (started.length === 0) return;
 
-  await Promise.all(started.map(updateTomato));
+  await Promise.all(started.map(t => updateTomato(t)));
 
   const expired = started.filter(t => t.until < +now);
 
   console.log(`expired ${expired.length} / ${started.length}`);
   console.log(expired);
 
-  await Promise.all(expired.map(tomato => stopTomato(tomato, app.client)));
+  await Promise.all(expired.map(tomato => stopTomato(tomato)));
 }

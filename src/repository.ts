@@ -20,6 +20,24 @@ export async function getToken(user: string) {
   return item.user?.token;
 }
 
+export async function getTokens({teamId, userId}: { teamId: string, userId: string }) {
+  let cond = AppInstallationModel.scan('team.id').eq(teamId);
+  if (userId) {
+    cond = cond.and().where('id').eq(userId);
+  }
+  const res = await cond.exec();
+  if (res.count === 0) {
+    throw new Error('No matching authorizations');
+  }
+  const installation = res[0];
+  return {
+    botToken: installation.bot.token,
+    userToken: installation.user.token,
+    botId: installation.bot.id,
+    botUserId: installation.bot.userId,
+  };
+}
+
 export async function fetchStartedTomatoes(now: Date): Promise<Tomato[]> {
   const items = await TomatoModel.query('GS1PK').eq('TOMATO#STATUS#started').using('GS1').exec();
   console.log('items', items.length);

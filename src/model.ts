@@ -1,6 +1,6 @@
 import * as dynamoose from "dynamoose";
 import { Item } from 'dynamoose/dist/Item'
-import { Tomato } from './interface'
+import { AppInstallation, Tomato } from './interface'
 
 const AppInstallationSchema = new dynamoose.Schema({
   id: String,
@@ -39,20 +39,20 @@ const AppInstallationSchema = new dynamoose.Schema({
   "timestamps": true
 });
 
-class AppInstallation extends Item {
-  id?: string;
-  user?: {
-    token: string;
-    id: string;
+export class AppInstallationItem extends Item implements AppInstallation {
+  id = '';
+  user = {
+    token: '',
+    id: ''
   };
-  bot?: {
-    token: string;
-    userId: string;
-    id: string;
+  bot = {
+    token: '',
+    userId: '',
+    id: ''
   }
 }
 
-export const AppInstallationModel = dynamoose.model<AppInstallation>('installations', AppInstallationSchema, { initialize: false });
+export const AppInstallationModel = dynamoose.model<AppInstallationItem>('installations', AppInstallationSchema, { initialize: false });
 
 class TomatoItem extends Item implements Tomato {
   GS1PK = '';
@@ -64,6 +64,8 @@ class TomatoItem extends Item implements Tomato {
   text = '';
   channel = '';
   status: 'started' | 'stopped' | 'completed' = 'stopped';
+  botToken = '';
+  userToken = '';
 }
 
 const TomatoSchema = new dynamoose.Schema({
@@ -83,6 +85,8 @@ const TomatoSchema = new dynamoose.Schema({
     type: String,
     enum: ['started', 'stopped', 'completed']
   },
+  botToken: String,
+  userToken: String,
   GS1PK: {
     type: String,
     required: true,
@@ -92,6 +96,9 @@ const TomatoSchema = new dynamoose.Schema({
       throughput: 'ON_DEMAND'
     }
   },
+}, {
+  "saveUnknown": true,
+  "timestamps": true
 });
 
 export const TomatoModel = dynamoose.model<TomatoItem>('tomato', TomatoSchema, { initialize: false });

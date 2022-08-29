@@ -1,51 +1,12 @@
-import { App, LogLevel, ExpressReceiver, InstallationStore, Installation, Logger, InstallationQuery } from '@slack/bolt';
+import { App, LogLevel, ExpressReceiver } from '@slack/bolt';
 import serverlessExpress from '@vendia/serverless-express';
-import { AppInstallationModel } from './model'
-
-class DDInstallationStore implements InstallationStore {
-  constructor ({}) {
-
-  }
-
-  async storeInstallation<AuthVersion extends 'v1' | 'v2'>(installation: Installation<AuthVersion, boolean>, logger?: Logger): Promise<void> {
-    console.info(installation);
-    const item = new AppInstallationModel(installation);
-    item.id = item.user?.id;
-    if (installation.isEnterpriseInstall && installation.enterprise !== undefined) {
-      throw new Error('not yet implemented')
-    }
-    if (installation.team !== undefined) {
-      await item.save();
-      return;
-    }
-    throw new Error('Failed saving installation data to installationStore');
-  }
-
-  async fetchInstallation(installQuery: InstallationQuery<boolean>, logger?: Logger): Promise<Installation<'v1' | 'v2', boolean>> {
-    console.info(installQuery);
-    throw new Error('not yet implemented');
-    if (installQuery.isEnterpriseInstall && installQuery.enterpriseId !== undefined) {
-      throw new Error('not yet implemented');
-    }
-    if (installQuery.teamId !== undefined) {
-    }
-    throw new Error('Failed fetching installation');
-  }
-
-  async deleteInstallation(installQuery: InstallationQuery<boolean>, logger?: Logger): Promise<void> {
-    console.log(installQuery);
-    throw new Error('not yet implemented');
-    if (installQuery.isEnterpriseInstall && installQuery.enterpriseId !== undefined) {
-    }
-    if (installQuery.teamId !== undefined) {
-    }
-    throw new Error('Failed to delete installation');
-  }
-}
+import { DDInstallationStore } from './installation-store'
+import { initModels } from './model'
 
 const expressReceiver = new ExpressReceiver({
   installerOptions: {
     userScopes: ['dnd:read', 'dnd:write', 'users.profile:write', 'users:write', 'chat:write'],
+    stateVerification: false,
   },
   logLevel: LogLevel.DEBUG,
   signingSecret: process.env.SLACK_SIGNING_SECRET!,
@@ -57,10 +18,17 @@ const expressReceiver = new ExpressReceiver({
   processBeforeResponse: true
 });
 
-const app = new App({
+new App({
   receiver: expressReceiver
 });
 
-module.exports.handler = serverlessExpress({
-  app: expressReceiver.app
-});
+let serverlessExpressInstance: any;
+
+module.exports.handler = async function handler (event: any, context: any) {
+  if (!serverlessExpressInstance) {
+    await initModels();
+    serverlessExpressInstance = serverlessExpress({ app: expressReceiver. app });
+  }
+
+  return serverlessExpressInstance(event, context)
+}

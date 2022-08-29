@@ -1,5 +1,18 @@
 export type UserList = string[];
 
+export interface AppInstallation {
+  id: string,
+  user: {
+    token: string;
+    id: string;
+  };
+  bot: {
+    token: string;
+    userId: string;
+    id: string;
+  }
+}
+
 export interface Tomato {
   user: string;
   lastTs: string;
@@ -8,4 +21,6 @@ export interface Tomato {
   text: string;
   channel: string;
   status: 'started' | 'stopped' | 'completed';
+  botToken: string;
+  userToken: string;
 }
