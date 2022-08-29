@@ -7,7 +7,7 @@ import { DDInstallationStore } from './installation-store'
 export function init(app: App) {
   app.command('/tomato', async ({ command, ack, say, client, context }) => {
     await ack();
-    const text = `<@${command.user_id}> has started a tomato \`${command.text}\` for 5 mins...`;
+    const text = `<@${command.user_id}> has started a tomato for 5 mins...\n>${command.text}`;
     await ensure(async () => {
       const res = await say({
         username: command.user_name,
@@ -115,10 +115,11 @@ async function stopTomato(tomato: Tomato, client?: WebClient) {
   tomato.lastTs = '';
   await patchTomato(tomato);
   if (!ts) return;
+  if (tomato.status === 'stopped') return;
   await client.chat.postMessage({
     thread_ts: ts,
     channel: 'C03V6AS6GV6',
-    text: tomato.status === 'stopped' ? '중간에 중단했습니다' : '정상적으로 종료했습니다',
+    text: '정상적으로 종료했습니다',
     metadata: JSON.stringify({
       event_type: 'tomato_completed',
       event_payload: {

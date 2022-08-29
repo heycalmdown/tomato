@@ -31,11 +31,11 @@ Resources:
     Properties:
       Handler: src/timer.handler
       Role: arn:aws:iam::472696305832:role/tomato-dev
-      # Events:
-      #   PerMinutes:
-      #     Type: Schedule
-      #     Properties:
-      #       Schedule: rate(1 minute)
+      Events:
+        PerMinutes:
+          Type: Schedule
+          Properties:
+            Schedule: rate(1 minute)
 
   SlackCommand:
     Type: AWS::Serverless::Function
