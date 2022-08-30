@@ -2,15 +2,19 @@ export type UserList = string[];
 
 export interface AppInstallation {
   id: string,
-  user: {
-    token: string;
-    id: string;
+  user?: {
+    token?: string;
+    id?: string;
   };
-  bot: {
-    token: string;
-    userId: string;
+  team?: {
     id: string;
-  }
+    name?: string;
+  };
+  bot?: {
+    token?: string;
+    userId?: string;
+    id?: string;
+  };
 }
 
 export interface Tomato {

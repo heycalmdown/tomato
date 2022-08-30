@@ -1,10 +1,10 @@
-import { Tomato } from './interface'
+import { WebClient } from '@slack/web-api'
+import { AppInstallation, Tomato } from './interface'
 import { TomatoModel, AppInstallationModel } from './model';
 
 export async function fetchTomato(user: string): Promise<Tomato> {
   console.log('fetchTomato');
   const t = await TomatoModel.get(user);
-  console.log(t);
   return t;
 }
 
@@ -13,6 +13,11 @@ export async function patchTomato(tomato: Tomato) {
   item.GS1PK = `TOMATO#STATUS#${item.status}`;
   await item.save();
   return tomato;
+}
+
+export async function deleteTomato(user: string) {
+  await TomatoModel.delete(user);
+  return;
 }
 
 export async function getToken(user: string) {
@@ -27,6 +32,12 @@ export async function getTokens({teamId, userId}: { teamId: string, userId: stri
   }
   const res = await cond.exec();
   if (res.count === 0) {
+    const res = await AppInstallationModel.query('id').eq('TEAM#' + teamId).exec();
+    if (res.count > 0) {
+      const token = res[0].bot.token
+      const client = new WebClient(token)
+      await client.chat.postMessage({ channel: userId, text: 'add to sign 다시 해줘잉\nhttps://27dvit18xj.execute-api.ap-northeast-2.amazonaws.com/Prod/slack/install'})
+    }
     throw new Error('No matching authorizations');
   }
   const installation = res[0];
@@ -50,4 +61,22 @@ export async function fetchRottenTomatoes(now: Date) {
   // const items = await TomatoModel.query('GS1PK').eq('TOMATO#STATUS#started').and().where('until').le(+now).using('GS1').exec();
   console.log('items', items.length);
   return items;
+}
+
+
+export async function patchInstallation(installation: AppInstallation) {
+    console.info(installation);
+    const item = new AppInstallationModel(installation);
+    if (installation.team !== undefined) {
+      await item.save();
+      if (!(await existBotToken(installation.team.id))) {
+        item.id = 'TEAM#' + installation.team.id;
+        await item.save();
+      }
+    }
+}
+
+export async function existBotToken(team: string): Promise<boolean> {
+  const res = await AppInstallationModel.query('id').eq('TEAM#' + team).count().exec();
+  return res?.count > 0;
 }

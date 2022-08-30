@@ -1,5 +1,6 @@
 import { InstallationStore, Installation, Logger, InstallationQuery } from '@slack/bolt';
 import { AppInstallationModel } from './model'
+import { patchInstallation } from './repository'
 
 export class DDInstallationStore implements InstallationStore {
   constructor ({}) {
@@ -7,17 +8,11 @@ export class DDInstallationStore implements InstallationStore {
   }
 
   async storeInstallation<AuthVersion extends 'v1' | 'v2'>(installation: Installation<AuthVersion, boolean>, logger?: Logger): Promise<void> {
-    console.info(installation);
-    const item = new AppInstallationModel(installation);
-    item.id = item.user?.id;
-    if (installation.isEnterpriseInstall && installation.enterprise !== undefined) {
-      throw new Error('not yet implemented')
+    const item = {
+      ...installation,
+      id: installation.user.id
     }
-    if (installation.team !== undefined) {
-      await item.save();
-      return;
-    }
-    throw new Error('Failed saving installation data to installationStore');
+    await patchInstallation(item);
   }
 
   async fetchInstallation(installQuery: InstallationQuery<boolean>, logger?: Logger): Promise<Installation<'v1' | 'v2', boolean>> {

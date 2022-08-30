@@ -1,6 +1,6 @@
 import { App, Block, asCodedError, KnownBlock, SlashCommand } from '@slack/bolt';
 import { WebClient } from '@slack/web-api'
-import { fetchTomato, patchTomato, fetchStartedTomatoes, getToken } from './repository';
+import { fetchTomato, patchTomato, fetchStartedTomatoes, getToken, deleteTomato } from './repository';
 import { Tomato } from './interface'
 import { DDInstallationStore } from './installation-store'
 
@@ -65,6 +65,7 @@ export function init(app: App) {
       await Promise.all(event.tokens.oauth.map(userId => store.deleteInstallation({
         teamId, enterpriseId, isEnterpriseInstall, userId,
       })))
+      await Promise.all(event.tokens.oauth.map(deleteTomato));
     }
   });
 }

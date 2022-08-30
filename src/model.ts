@@ -45,6 +45,10 @@ export class AppInstallationItem extends Item implements AppInstallation {
     token: '',
     id: ''
   };
+  team = {
+    id: '',
+    name: ''
+  };
   bot = {
     token: '',
     userId: '',
