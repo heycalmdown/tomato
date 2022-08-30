@@ -8,7 +8,8 @@ export function init(app: App) {
   app.command('/tomato', async ({ command, ack, say, client, context }) => {
     await ack();
     console.log('/tomato')
-    const text = `<@${command.user_id}> has started a tomato for 5 mins...\n>${command.text}`;
+    const interval = 25;
+    const text = `<@${command.user_id}> has started a tomato for ${interval} mins...\n>${command.text}`;
     const tomato = await fetchTomato(command.user_id);
     if (tomato.status === 'started') {
       await client.chat.postMessage({
@@ -26,13 +27,13 @@ export function init(app: App) {
         blocks: createBlocks(text, command.user_id),
       });
       const now = new Date();
-      const until = +new Date(+now + mins(5))
+      const until = +new Date(+now + mins(interval))
       const tomato: Tomato = {
         user: command.user_id,
         channel: command.channel_id,
         text,
         lastTs: res.ts!,
-        mins: 5,
+        mins: interval,
         until,
         status: 'started',
         botToken: context.botToken!,
