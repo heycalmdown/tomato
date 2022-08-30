@@ -45,11 +45,13 @@ export async function getTokens({teamId, userId}: { teamId: string, userId: stri
     console.log('using cache');
     return tokenCache.get(userId)!;
   }
+  console.log('before scan');
   let cond = AppInstallationModel.scan('team.id').eq(teamId);
   if (userId) {
     cond = cond.and().where('id').eq(userId);
   }
   const res = await cond.exec();
+  console.log('after scan');
   if (res.count === 0) {
     const res = await AppInstallationModel.query('id').eq('TEAM#' + teamId).exec();
     if (res.count > 0) {

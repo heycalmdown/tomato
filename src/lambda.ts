@@ -14,7 +14,10 @@ const app = new App({
 	clientSecret: process.env.SLACK_CLIENT_SECRET,
   signingSecret: process.env.SLACK_SIGNING_SECRET,
   authorize: async ({ teamId, userId }) => {
-    return getTokens({ teamId: teamId!, userId: userId! })
+    console.log('before get tokens');
+    const tokens = await getTokens({ teamId: teamId!, userId: userId! })
+    console.log('after get tokens');
+    return tokens;
   },
   installationStore: new DDInstallationStore({}),
   receiver: awsLambdaReceiver,
@@ -24,7 +27,9 @@ const app = new App({
 init(app);
 
 module.exports.handler = async (event: any, context: any, callback: any) => {
+  console.log('before init model')
   await initModels();
+  console.log('after init model')
   const handler = await awsLambdaReceiver.start();
   return handler(event, context, callback);
 }

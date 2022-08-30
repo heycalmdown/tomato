@@ -9,6 +9,16 @@ export function init(app: App) {
     await ack();
     console.log('/tomato')
     const text = `<@${command.user_id}> has started a tomato for 5 mins...\n>${command.text}`;
+    const tomato = await fetchTomato(command.user_id);
+    if (tomato.status === 'started') {
+      await client.chat.postMessage({
+        thread_ts: tomato.lastTs,
+        channel: tomato.channel,
+        text: `>${command.text}`,
+        as_user: true,
+      })
+      return;
+    }
     await ensure(async () => {
       const res = await say({
         username: command.user_name,
@@ -127,7 +137,7 @@ async function stopTomato(tomato: Tomato, client?: WebClient) {
   if (tomato.status === 'stopped') return;
   await client.chat.postMessage({
     thread_ts: ts,
-    channel: 'C03V6AS6GV6',
+    channel: tomato.channel,
     text: '정상적으로 종료했습니다',
     metadata: JSON.stringify({
       event_type: 'tomato_completed',
