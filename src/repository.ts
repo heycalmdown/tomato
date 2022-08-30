@@ -57,7 +57,7 @@ export async function getTokens({teamId, userId}: { teamId: string, userId: stri
     if (res.count > 0) {
       const token = res[0].bot.token
       const client = new WebClient(token)
-      await client.chat.postMessage({ channel: userId, text: 'add to sign 다시 해줘잉\nhttps://27dvit18xj.execute-api.ap-northeast-2.amazonaws.com/Prod/slack/install'})
+      await client.chat.postMessage({ channel: userId, text: 'Add to Slack 다시 해줘잉\nhttps://tomato.hyperwork.co/slack/install'})
     }
     throw new Error('No matching authorizations');
   }

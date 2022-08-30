@@ -1,5 +1,6 @@
 import { App } from '@slack/bolt';
-import { init, expireTomatoes } from './handlers'
+import { init } from './handlers'
+import { refreshTomatoes } from './service/tomato'
 
 const app = new App ({
   signingSecret: process.env.SLACK_SIGNING_SECRET,
@@ -11,7 +12,7 @@ const app = new App ({
 
 init(app);
 
-setInterval(expireTomatoes, 1 * 60 * 1000);
+setInterval(refreshTomatoes, 1 * 60 * 1000);
 
 (async () => {
   // Start your app
@@ -19,5 +20,5 @@ setInterval(expireTomatoes, 1 * 60 * 1000);
 
   console.log('⚡️ Bolt app is running!');
 
-  await expireTomatoes();
+  await refreshTomatoes();
 })();

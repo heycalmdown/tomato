@@ -15,7 +15,6 @@ Globals:
         SLACK_SIGNING_SECRET: '{{resolve:ssm:/tomato/SLACK_SIGNING_SECRET}}'
         SLACK_CLIENT_ID: '{{resolve:ssm:/tomato/SLACK_CLIENT_ID}}'
         SLACK_CLIENT_SECRET: '{{resolve:ssm:/tomato/SLACK_CLIENT_SECRET}}'
-        SLACK_BOT_TOKEN: '{{resolve:ssm:/tomato/SLACK_BOT_TOKEN}}'
 
 Resources:
   Update:
@@ -27,9 +26,9 @@ Resources:
         Target: "es2020"
         Sourcemap: true
         EntryPoints: 
-          - src/timer.ts
+          - src/refresh.ts
     Properties:
-      Handler: src/timer.handler
+      Handler: src/refresh.handler
       Role: arn:aws:iam::472696305832:role/tomato-dev
       Events:
         PerMinutes:
@@ -46,9 +45,9 @@ Resources:
         Target: "es2020"
         Sourcemap: true
         EntryPoints: 
-          - src/lambda.ts
+          - src/command.ts
     Properties:
-      Handler: src/lambda.handler
+      Handler: src/command.handler
       Role: arn:aws:iam::472696305832:role/tomato-dev
       Events:
         Http:

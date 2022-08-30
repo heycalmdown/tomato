@@ -1,8 +1,8 @@
 import { initModels } from './model';
-import { expireTomatoes } from './handlers'
+import { refreshTomatoes } from './service/tomato'
 
 module.exports.handler = async () => {
   await initModels();
-  await expireTomatoes();
+  await refreshTomatoes();
   return { test: 1 };
 }
