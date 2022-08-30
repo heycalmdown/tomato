@@ -7,6 +7,7 @@ import { DDInstallationStore } from './installation-store'
 export function init(app: App) {
   app.command('/tomato', async ({ command, ack, say, client, context }) => {
     await ack();
+    console.log('/tomato')
     const text = `<@${command.user_id}> has started a tomato for 5 mins...\n>${command.text}`;
     await ensure(async () => {
       const res = await say({
@@ -16,7 +17,7 @@ export function init(app: App) {
       });
       const now = new Date();
       const until = +new Date(+now + mins(5))
-      const tomato = await patchTomato({
+      const tomato: Tomato = {
         user: command.user_id,
         channel: command.channel_id,
         text,
@@ -26,13 +27,17 @@ export function init(app: App) {
         status: 'started',
         botToken: context.botToken!,
         userToken: context.userToken!,
-      });
-      await startTomato(tomato, client, command.text);
+      }
+      await Promise.allSettled([
+        startTomato(tomato, client, command.text),
+        patchTomato(tomato),
+      ]);
     }, client, command);
   });
 
   app.action('stop-tomato', async ({ ack, action, client, body}) => {
     await ack();
+    console.log('stop-tomato')
     if (body.type !== 'block_actions') return;
     if (action.type !== 'button') return;
     if (!body.message) return;
@@ -92,13 +97,14 @@ async function ensure(func: Function, client: WebClient, command: SlashCommand) 
 
 async function startTomato(tomato: Tomato, client: WebClient, status: string) {
   const token = await getToken(tomato.user);
-
-  await client.dnd.setSnooze({ num_minutes: tomato.mins, token })
-  await client.users.profile.set({ token, profile: JSON.stringify({
-    status_text: status,
-    status_emoji: ':tomato:'
-  })});
-  await client.users.setPresence({ presence: 'away', token })
+  await Promise.allSettled([
+    client.dnd.setSnooze({ num_minutes: tomato.mins, token }),
+    client.users.profile.set({ token, profile: JSON.stringify({
+      status_text: status,
+      status_emoji: ':tomato:'
+    })}),
+    client.users.setPresence({ presence: 'away', token }),
+  ])
 }
 
 async function stopTomato(tomato: Tomato, client?: WebClient) {
@@ -107,11 +113,13 @@ async function stopTomato(tomato: Tomato, client?: WebClient) {
   const now = new Date();
   const ts = tomato.lastTs;
   const token = await getToken(tomato.user);
-  await client.dnd.endSnooze({ token });
-  await client.users.profile.set({ token, name: 'status_text', value: '원래대로' });
-  await client.users.setPresence({ presence: 'auto', token });
   tomato.status = (+now - tomato.until) <= 0 ? 'stopped' : 'completed';
-  await updateTomato(tomato, client)
+  await Promise.allSettled([
+    client.dnd.endSnooze({ token }),
+    client.users.profile.set({ token, name: 'status_text', value: '원래대로' }),
+    client.users.setPresence({ presence: 'auto', token }),
+    updateTomato(tomato, client),
+  ])
   tomato.until = Number.MAX_SAFE_INTEGER;
   tomato.lastTs = '';
   await patchTomato(tomato);

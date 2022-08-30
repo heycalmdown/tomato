@@ -1,3 +1,4 @@
+import { AuthorizeResult } from '@slack/bolt'
 import { WebClient } from '@slack/web-api'
 import { AppInstallation, Tomato } from './interface'
 import { TomatoModel, AppInstallationModel } from './model';
@@ -20,12 +21,30 @@ export async function deleteTomato(user: string) {
   return;
 }
 
+const tokenCache = new Map<string, AuthorizeResult>();
+
 export async function getToken(user: string) {
+  if (tokenCache.has(user)) {
+    console.log('using cache');
+    const cache = tokenCache.get(user);
+    return cache?.userToken;
+  }
   const item = await AppInstallationModel.get(user);
+  const cache: AuthorizeResult = {
+    botToken: item.bot.token,
+    userToken: item.user.token,
+    botId: item.bot.id,
+    botUserId: item.bot.userId,
+  };
+  tokenCache.set(user, cache);
   return item.user?.token;
 }
 
-export async function getTokens({teamId, userId}: { teamId: string, userId: string }) {
+export async function getTokens({teamId, userId}: { teamId: string, userId: string }): Promise<AuthorizeResult> {
+  if (tokenCache.has(userId)) {
+    console.log('using cache');
+    return tokenCache.get(userId)!;
+  }
   let cond = AppInstallationModel.scan('team.id').eq(teamId);
   if (userId) {
     cond = cond.and().where('id').eq(userId);
@@ -41,12 +60,14 @@ export async function getTokens({teamId, userId}: { teamId: string, userId: stri
     throw new Error('No matching authorizations');
   }
   const installation = res[0];
-  return {
+  const cache: AuthorizeResult = {
     botToken: installation.bot.token,
     userToken: installation.user.token,
     botId: installation.bot.id,
     botUserId: installation.bot.userId,
   };
+  tokenCache.set(userId, cache);
+  return cache;
 }
 
 export async function fetchStartedTomatoes(now: Date): Promise<Tomato[]> {
@@ -79,4 +100,20 @@ export async function patchInstallation(installation: AppInstallation) {
 export async function existBotToken(team: string): Promise<boolean> {
   const res = await AppInstallationModel.query('id').eq('TEAM#' + team).count().exec();
   return res?.count > 0;
+}
+
+
+export async function deleteInstallation(query: any): Promise<void> {
+    console.log(query);
+    if (query.teamId !== undefined) {
+      let cond = AppInstallationModel.scan('team.id').eq(query.teamId);
+      if (query.userId) {
+        cond = cond.and().where('id').eq(query.userId);
+        tokenCache.delete(query.userId);
+      }
+      const res = await cond.exec();
+      await Promise.allSettled(res.map(i => i.delete()))
+      return;
+    }
+    throw new Error('Failed to delete installation');
 }
