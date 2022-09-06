@@ -1,59 +1,74 @@
 import { AuthorizeResult } from '@slack/bolt'
 import { WebClient } from '@slack/web-api'
 import { AppInstallation, Tomato } from './interface'
-import { TomatoModel, AppInstallationModel } from './model';
+import { TomatoModel, AppInstallationModel, AppInstallationModelSK, AppInstallationModelPK, TomatoPK, TomatoSK, TomatoGS1PK, AppInstallationModelGS1PK, BYTEAMPK } from './model';
 
-export async function fetchTomato(user: string): Promise<Tomato> {
+export function genUid(teamId: string, userId: string): string {
+  return `${teamId}-${userId}`;
+}
+
+export async function fetchTomato(uid: string): Promise<Tomato> {
   console.log('fetchTomato');
-  const t = await TomatoModel.get(user);
+  const t = await TomatoModel.get({ PK: TomatoPK(uid), SK: TomatoSK() });
+  console.log(t);
   return t;
 }
 
 export async function patchTomato(tomato: Tomato) {
+  const auth = await getTokenByUser(tomato.user)
   const item = new TomatoModel(tomato);
-  item.GS1PK = `TOMATO#STATUS#${item.status}`;
+  item.PK = TomatoPK(tomato.user);
+  item.SK = TomatoSK();
+  item.BYSTATUSPK = TomatoGS1PK(tomato.status);
+  item.BYTEAMPK = BYTEAMPK(auth.teamId!);
   await item.save();
   return tomato;
 }
 
-export async function deleteTomato(user: string) {
-  await TomatoModel.delete(user);
+export async function deleteTomato(uid: string) {
+  const items = await TomatoModel.query('PK').eq(TomatoPK(uid)).exec();
+  await Promise.allSettled(items.map(i => i.delete()));
   return;
 }
 
 const tokenCache = new Map<string, AuthorizeResult>();
 
-export async function getToken(user: string) {
-  if (tokenCache.has(user)) {
+export async function getToken(uid: string) {
+  const cache = await getTokenByUser(uid);
+  return cache.userToken;
+}
+
+export async function getTokenByUser(uid: string): Promise<AuthorizeResult> {
+  if (tokenCache.has(uid)) {
     console.log('using cache');
-    const cache = tokenCache.get(user);
-    return cache?.userToken;
+    return tokenCache.get(uid)!;
   }
-  const item = await AppInstallationModel.get(user);
+  const item = await AppInstallationModel.get({PK: AppInstallationModelPK(uid), SK: AppInstallationModelSK() });
   const cache: AuthorizeResult = {
     botToken: item.bot.token,
     userToken: item.user.token,
     botId: item.bot.id,
     botUserId: item.bot.userId,
   };
-  tokenCache.set(user, cache);
-  return item.user?.token;
+  tokenCache.set(uid, cache);
+  return item;
 }
 
 export async function getTokens({teamId, userId}: { teamId: string, userId: string }): Promise<AuthorizeResult> {
-  if (tokenCache.has(userId)) {
+  const uid = genUid(teamId, userId);
+  if (tokenCache.has(uid)) {
     console.log('using cache');
-    return tokenCache.get(userId)!;
+    return tokenCache.get(uid)!;
   }
-  console.log('before scan');
-  let cond = AppInstallationModel.scan('team.id').eq(teamId);
-  if (userId) {
-    cond = cond.and().where('id').eq(userId);
-  }
-  const res = await cond.exec();
-  console.log('after scan');
+  console.log('before query');
+  const res = await AppInstallationModel.query({ PK: AppInstallationModelPK(userId), SK: AppInstallationModelSK() }).exec();
+  console.log('after query');
   if (res.count === 0) {
-    const res = await AppInstallationModel.query('id').eq('TEAM#' + teamId).exec();
+    console.log('fallback');
+    const cond = AppInstallationModel.query('BYTEAMPK').eq(AppInstallationModelGS1PK(teamId)).using('BYTEAM');
+    const req = await cond.getRequest();
+    console.log('req', req);
+    const res = await AppInstallationModel.query('BYTEAMPK').eq(AppInstallationModelGS1PK(teamId)).using('BYTEAM').exec();
     if (res.count > 0) {
       const token = res[0].bot.token
       const client = new WebClient(token)
@@ -68,42 +83,27 @@ export async function getTokens({teamId, userId}: { teamId: string, userId: stri
     botId: installation.bot.id,
     botUserId: installation.bot.userId,
   };
-  tokenCache.set(userId, cache);
+  tokenCache.set(uid, cache);
   return cache;
 }
 
 export async function fetchStartedTomatoes(now: Date): Promise<Tomato[]> {
-  const items = await TomatoModel.query('GS1PK').eq('TOMATO#STATUS#started').using('GS1').exec();
-  console.log('items', items.length);
-  return items;
-}
-
-export async function fetchRottenTomatoes(now: Date) {
-  console.log('111')
-  const items = await TomatoModel.query('GS1PK').eq('TOMATO#STATUS#started').using('GS1').exec();
-  // const items = await TomatoModel.query('GS1PK').eq('TOMATO#STATUS#started').and().where('until').le(+now).using('GS1').exec();
+  const items = await TomatoModel.query('BYSTATUSPK').eq(TomatoGS1PK('started')).using('BYSTATUS').exec();
   console.log('items', items.length);
   return items;
 }
 
 
-export async function patchInstallation(installation: AppInstallation) {
-    console.info(installation);
-    const item = new AppInstallationModel(installation);
-    if (installation.team !== undefined) {
+export async function patchInstallation(install: AppInstallation) {
+    console.info(install);
+    if (install.team !== undefined && install.user) {
+      const item = new AppInstallationModel(install);
+      item.PK = AppInstallationModelPK(genUid(install.team.id, install.user.id));
+      item.SK = AppInstallationModelSK();
+      item.BYTEAMPK = AppInstallationModelGS1PK(install.team.id);
       await item.save();
-      if (!(await existBotToken(installation.team.id))) {
-        item.id = 'TEAM#' + installation.team.id;
-        await item.save();
-      }
     }
 }
-
-export async function existBotToken(team: string): Promise<boolean> {
-  const res = await AppInstallationModel.query('id').eq('TEAM#' + team).count().exec();
-  return res?.count > 0;
-}
-
 
 export async function deleteInstallation(query: any): Promise<void> {
     console.log(query);

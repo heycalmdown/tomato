@@ -1,6 +1,5 @@
 import { InstallationStore, Installation, Logger, InstallationQuery } from '@slack/bolt';
-import { AppInstallationModel } from './model'
-import { patchInstallation } from './repository'
+import { deleteInstallation, patchInstallation } from './repository'
 
 export class DDInstallationStore implements InstallationStore {
   constructor ({}) {
@@ -28,19 +27,6 @@ export class DDInstallationStore implements InstallationStore {
   }
 
   async deleteInstallation(query: InstallationQuery<boolean>, logger?: Logger): Promise<void> {
-    console.log(query);
-    if (query.isEnterpriseInstall && query.enterpriseId !== undefined) {
-      throw new Error('not yet implemented');
-    }
-    if (query.teamId !== undefined) {
-      let cond = AppInstallationModel.scan('team.id').eq(query.teamId);
-      if (query.userId) {
-        cond = cond.and().where('id').eq(query.userId);
-      }
-      const res = await cond.exec();
-      await Promise.allSettled(res.map(i => i.delete()))
-      return;
-    }
-    throw new Error('Failed to delete installation');
+    await deleteInstallation(query);
   }
 }

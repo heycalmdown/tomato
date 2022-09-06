@@ -1,12 +1,12 @@
 import { asCodedError, KnownBlock } from '@slack/bolt';
 import { WebClient } from '@slack/web-api'
 
-import { fetchTomato, patchTomato, getToken, getTokens } from '../repository';
+import { fetchTomato, patchTomato, getToken, getTokens, genUid } from '../repository';
 import { Tomato } from '../interface'
 
 export async function onTomato(team: string, user: string, command_text: string, channel: string, client: WebClient) {
     const interval = 25;
-    const tomato = await fetchTomato(user);
+    const tomato = await fetchTomato(genUid(team, user));
     if (tomato?.status === 'started') {
       await client.chat.postMessage({
         thread_ts: tomato.lastTs,
@@ -22,12 +22,12 @@ export async function onTomato(team: string, user: string, command_text: string,
         channel,
         username: 'Tomato',
         text, mrkdwn: true,
-        blocks: createBlocks(text, user),
+        blocks: createBlocks(text, genUid(team, user)),
       });
       const now = new Date();
       const until = +new Date(+now + mins(interval))
       const tomato: Tomato = {
-        user,
+        user: genUid(team, user),
         channel,
         text,
         lastTs: res.ts!,
@@ -75,7 +75,7 @@ async function startTomato(tomato: Tomato, client: WebClient, status: string) {
   ])
 }
 
-function createBlocks(text: string, user: string): KnownBlock[] {
+function createBlocks(text: string, uid: string): KnownBlock[] {
   return [
     {
       type: 'section',
@@ -93,7 +93,7 @@ function createBlocks(text: string, user: string): KnownBlock[] {
             text: 'Stop :tomato:',
             emoji: true
           },
-          value: [user].join('-'),
+          value: [uid].join('-'),
           action_id: 'stop-tomato'
         }
       ]

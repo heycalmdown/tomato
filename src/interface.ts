@@ -4,7 +4,7 @@ export interface AppInstallation {
   id: string,
   user?: {
     token?: string;
-    id?: string;
+    id: string;
   };
   team?: {
     id: string;

@@ -1,8 +1,4 @@
-import { App, Block, KnownBlock } from '@slack/bolt';
-import { WebClient } from '@slack/web-api'
-import { fetchTomato, patchTomato, fetchStartedTomatoes, getToken, deleteTomato } from './repository';
-import { Tomato } from './interface'
-import { DDInstallationStore } from './installation-store'
+import { App } from '@slack/bolt';
 import { onTomato } from './controller/on-tomato'
 import { onStopTomato } from './controller/on-stop-tomato'
 import { onAppUninstalled } from './controller/on-app-uninstalled'

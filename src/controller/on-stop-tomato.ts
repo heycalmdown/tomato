@@ -1,7 +1,5 @@
-import { Block, KnownBlock } from '@slack/bolt';
 import { WebClient } from '@slack/web-api'
-import { fetchTomato, patchTomato, fetchStartedTomatoes, getToken } from '../repository';
-import { Tomato } from '../interface'
+import { fetchTomato } from '../repository';
 import { stopTomato, updateTomato } from '../service/tomato'
 
 export async function onStopTomato(user: string, ts: string, channel: string, client: WebClient) {

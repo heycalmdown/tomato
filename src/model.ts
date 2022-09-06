@@ -1,8 +1,24 @@
 import * as dynamoose from "dynamoose";
 import { Item } from 'dynamoose/dist/Item'
+import { TableOptionsOptional } from 'dynamoose/dist/Table'
 import { AppInstallation, Tomato } from './interface'
 
 const AppInstallationSchema = new dynamoose.Schema({
+  PK: {
+    type: String,
+    required: true,
+    hashKey: true
+  },
+  SK: {
+    type: String,
+    required: true,
+    rangeKey: true,
+  },
+  BYTEAMPK: {
+    type: String,
+    required: true,
+  },
+
   id: String,
   team: {
     type: Object,
@@ -35,11 +51,15 @@ const AppInstallationSchema = new dynamoose.Schema({
     }
   }
 }, {
-  "saveUnknown": true,
-  "timestamps": true
+  saveUnknown: true,
+  timestamps: true
 });
 
-export class AppInstallationItem extends Item implements AppInstallation {
+class AppInstallationItem extends Item implements AppInstallation {
+  PK = '';
+  SK = '';
+  BYTEAMPK = '';
+
   id = '';
   user = {
     token: '',
@@ -56,10 +76,23 @@ export class AppInstallationItem extends Item implements AppInstallation {
   }
 }
 
-export const AppInstallationModel = dynamoose.model<AppInstallationItem>('installations', AppInstallationSchema, { initialize: false });
+export const AppInstallationModel = dynamoose.model<AppInstallationItem>('installations', AppInstallationSchema);
+
+export function AppInstallationModelPK(uid: string) {
+  return 'USER#'+uid;
+}
+export function AppInstallationModelSK() {
+  return 'USER#INFO';
+}
+export function AppInstallationModelGS1PK(team: string) {
+  return 'TEAM#'+team;
+}
 
 class TomatoItem extends Item implements Tomato {
-  GS1PK = '';
+  PK = '';
+  SK = '';
+  BYSTATUSPK = '';
+  BYTEAMPK = '';
 
   user = '';
   lastTs = '';
@@ -73,16 +106,38 @@ class TomatoItem extends Item implements Tomato {
 }
 
 const TomatoSchema = new dynamoose.Schema({
-  user: {
+  PK: {
     type: String,
-    hashKey: true,
+    required: true,
+    hashKey: true
   },
-  lastTs: String,
-  mins: Number,
-  until: {
-    type: Number,
+  SK: {
+    type: String,
+    required: true,
     rangeKey: true,
   },
+  BYSTATUSPK: {
+    type: String,
+    required: true,
+    index: {
+      name: 'BYSTATUS',
+      rangeKey: 'until',
+      throughput: 'ON_DEMAND'
+    }
+  },
+  BYTEAMPK: {
+    type: String,
+    required: true,
+    index: {
+     name: 'BYTEAM',
+      throughput: 'ON_DEMAND'
+    }
+  },
+
+  user: String,
+  lastTs: String,
+  mins: Number,
+  until: Number,
   text: String,
   channel: String,
   status: {
@@ -91,30 +146,48 @@ const TomatoSchema = new dynamoose.Schema({
   },
   botToken: String,
   userToken: String,
-  GS1PK: {
-    type: String,
-    required: true,
-    index: {
-      name: 'GS1',
-      rangeKey: 'until',
-      throughput: 'ON_DEMAND'
-    }
-  },
 }, {
-  "saveUnknown": true,
-  "timestamps": true
+  saveUnknown: true,
+  timestamps: true,
 });
 
-export const TomatoModel = dynamoose.model<TomatoItem>('tomato', TomatoSchema, { initialize: false });
+export const TomatoModel = dynamoose.model<TomatoItem>('tomato', TomatoSchema);
+
+export function TomatoPK(uid: string) {
+  return 'USER#' + uid;
+}
+
+export function TomatoSK() {
+  return 'USER#TOMATO';
+}
+
+export function TomatoGS1PK(status: string) {
+  return 'TOMATO#STATUS#'+status;
+}
+
+export function BYTEAMPK(team: string) {
+  return 'TEAM#'+team;
+}
 
 let initialized: Promise<any>;
 
-export async function initModels() {
-  if (initialized) return initialized;
+export async function initModels(migrate: boolean = false) {
+  const tableOptions: TableOptionsOptional = {
+    throughput: 'ON_DEMAND',
+    create: false,
+    waitForActive: false,
+    update: false,
+  };
+  if (migrate) {
+    tableOptions.create = true;
+    tableOptions.update = true;
+  }
+  console.log('install index', JSON.stringify(await AppInstallationSchema.getIndexes(AppInstallationModel),null, 2));
+  console.log('tomato index', JSON.stringify(await TomatoSchema.getIndexes(TomatoModel),null, 2));
+  if (!migrate && initialized) return initialized;
   initialized = new Promise((res, rej) => {
     const tables = [
-      new dynamoose.Table('installations', [AppInstallationModel], { throughput: 'ON_DEMAND', initialize: false, update: false }),
-      new dynamoose.Table('tomato', [TomatoModel], { throughput: 'ON_DEMAND', initialize: false, update: false })
+      new dynamoose.Table('tomato-dev', [TomatoModel, AppInstallationModel], tableOptions)
     ];
     Promise.allSettled(tables.map(t => t.initialize())).then(res).catch(e => {
       console.error(e);
