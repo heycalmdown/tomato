@@ -17,6 +17,10 @@ const AppInstallationSchema = new dynamoose.Schema({
   BYTEAMPK: {
     type: String,
     required: true,
+    index: {
+      name: 'BYTEAM',
+      throughput: 'ON_DEMAND'
+    }
   },
 
   id: String,
@@ -116,20 +120,20 @@ const TomatoSchema = new dynamoose.Schema({
     required: true,
     rangeKey: true,
   },
+  BYTEAMPK: {
+    type: String,
+    required: true,
+    index: {
+     name: 'BYTEAM',
+     throughput: 'ON_DEMAND'
+    }
+  },
   BYSTATUSPK: {
     type: String,
     required: true,
     index: {
       name: 'BYSTATUS',
       rangeKey: 'until',
-      throughput: 'ON_DEMAND'
-    }
-  },
-  BYTEAMPK: {
-    type: String,
-    required: true,
-    index: {
-     name: 'BYTEAM',
       throughput: 'ON_DEMAND'
     }
   },
@@ -173,17 +177,16 @@ let initialized: Promise<any>;
 
 export async function initModels(migrate: boolean = false) {
   const tableOptions: TableOptionsOptional = {
-    throughput: 'ON_DEMAND',
     create: false,
     waitForActive: false,
     update: false,
+    throughput: 'ON_DEMAND',
   };
   if (migrate) {
     tableOptions.create = true;
-    tableOptions.update = true;
+    tableOptions.waitForActive = true;
+    // tableOptions.update = true;
   }
-  console.log('install index', JSON.stringify(await AppInstallationSchema.getIndexes(AppInstallationModel),null, 2));
-  console.log('tomato index', JSON.stringify(await TomatoSchema.getIndexes(TomatoModel),null, 2));
   if (!migrate && initialized) return initialized;
   initialized = new Promise((res, rej) => {
     const tables = [

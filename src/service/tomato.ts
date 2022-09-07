@@ -40,7 +40,7 @@ function createRemainingTimeBlock(tomato: Tomato): KnownBlock {
     type: 'section',
     text: {
       type: 'plain_text',
-      text: `:hourglass_flowing_sand: 대충 ${Math.floor((tomato.until - now) / 1000)}초 남음`,
+      text: `:hourglass_flowing_sand: ${Math.floor((tomato.until - now) / 1000)} secs left appx.`,
       emoji: true,
     }
   }

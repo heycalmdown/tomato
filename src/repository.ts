@@ -61,7 +61,7 @@ export async function getTokens({teamId, userId}: { teamId: string, userId: stri
     return tokenCache.get(uid)!;
   }
   console.log('before query');
-  const res = await AppInstallationModel.query({ PK: AppInstallationModelPK(userId), SK: AppInstallationModelSK() }).exec();
+  const res = await AppInstallationModel.query({ PK: AppInstallationModelPK(uid), SK: AppInstallationModelSK() }).exec();
   console.log('after query');
   if (res.count === 0) {
     console.log('fallback');
