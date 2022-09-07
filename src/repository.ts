@@ -51,7 +51,7 @@ export async function getTokenByUser(uid: string): Promise<AuthorizeResult> {
     botUserId: item.bot.userId,
   };
   tokenCache.set(uid, cache);
-  return item;
+  return cache;
 }
 
 export async function getTokens({teamId, userId}: { teamId: string, userId: string }): Promise<AuthorizeResult> {
