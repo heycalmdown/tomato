@@ -1,19 +1,19 @@
 import { Block, KnownBlock } from '@slack/bolt';
 import { WebClient } from '@slack/web-api'
-import { patchTomato, fetchStartedTomatoes, getToken } from '../repository';
+import { patchTomato, fetchStartedTomatoes, getTokenByUser } from '../repository';
 import { Tomato } from '../interface'
 
 export async function stopTomato(tomato: Tomato, client?: WebClient) {
-  client = client || new WebClient(tomato.botToken);
+  const tokens = await getTokenByUser(tomato.user);
+  client = client || new WebClient(tokens.botToken);
 
   const now = new Date();
   const ts = tomato.lastTs;
-  const token = await getToken(tomato.user);
   tomato.status = (+now - tomato.until) <= 0 ? 'stopped' : 'completed';
   await Promise.allSettled([
-    client.dnd.endSnooze({ token }),
-    client.users.profile.set({ token, name: 'status_text', value: '원래대로' }),
-    client.users.setPresence({ presence: 'auto', token }),
+    client.dnd.endSnooze({ token: tokens.botToken }),
+    client.users.profile.set({ token: tokens.userToken, name: 'status_text', value: '원래대로' }),
+    client.users.setPresence({ presence: 'auto', token: tokens.userToken }),
     updateTomato(tomato, client),
   ])
   tomato.until = Number.MAX_SAFE_INTEGER;
